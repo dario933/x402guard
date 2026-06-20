@@ -5,7 +5,10 @@ const rules = require('./rules');
 
 const SKIP = new Set([
   'node_modules', '.git', 'dist', 'build', 'coverage', '.next', 'out',
-  'artifacts', 'cache', 'lib', '.vercel', 'forge-cache', 'broadcast', 'typechain-types'
+  'artifacts', 'cache', 'lib', '.vercel', 'forge-cache', 'broadcast', 'typechain-types',
+  // test scaffolding — skipped when encountered as a child dir during a tree walk.
+  // (Scanning one of these directly as the target still works, e.g. `npm test`.)
+  '__fixtures__', '__mocks__', '__tests__'
 ]);
 const EXT = { '.sol': 'sol', '.js': 'js', '.jsx': 'js', '.ts': 'js', '.tsx': 'js', '.mjs': 'js', '.cjs': 'js', '.py': 'py' };
 const SEVERITY_WEIGHT = { critical: 35, high: 12, medium: 4, low: 1 };
@@ -28,17 +31,19 @@ function walk(target, acc) {
   return acc;
 }
 
-function scan(target) {
+function scan(target, opts = {}) {
   const root = path.resolve(target);
+  const exclude = opts.exclude || [];
   const files = walk(root, []);
   const findings = [];
   for (const file of files) {
+    const relPath = (path.relative(root, file) || path.basename(file)).replace(/\\/g, '/');
+    if (exclude.length && exclude.some(x => relPath.includes(x))) continue;
     let text;
     try { text = fs.readFileSync(file, 'utf8'); } catch { continue; }
     if (text.length > MAX_BYTES) continue;
     const lines = text.split(/\r?\n/);
     const lang = EXT[path.extname(file)];
-    const relPath = path.relative(root, file) || path.basename(file);
     // comment-stripped copy: mitigation/keyword checks run against this so a
     // comment ("// we verify the HMAC here") can't hide a real vulnerability.
     const code = text.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1');
@@ -51,7 +56,7 @@ function scan(target) {
         findings.push({
           ruleId: rule.id, title: rule.title, severity: rule.severity, category: rule.category,
           why: rule.why, fix: rule.fix, ref: rule.ref || '',
-          file: path.relative(root, file) || path.basename(file), line: h.line, snippet: h.snippet || ''
+          file: relPath, line: h.line, snippet: h.snippet || ''
         });
       }
     }

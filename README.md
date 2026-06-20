@@ -80,7 +80,22 @@ Exit code is `1` when any critical/high finding is present (CI gate), else `0`.
 
 ### CI
 
-Copy `.github/workflows/x402guard.yml` into your repo. It runs on every PR and uploads a JSON report.
+Add this workflow to fail the build on any critical/high finding:
+
+```yaml
+name: x402guard
+on: [pull_request, push]
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npx x402guard . --json x402guard-report.json
+```
+
+Use `--exclude <substr>,<substr>` to skip paths (e.g. vendored code or fixtures).
 
 ### Tests
 

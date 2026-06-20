@@ -1,22 +1,26 @@
 name: x402guard
-# Drop this into any repo that ships x402 / agent-payment code.
-# Fails the build on any critical/high finding.
+# x402guard's own CI: run the unit tests, then self-scan.
+# (Drop-in template for YOUR repo is in the README — usually just:
+#   npx x402guard . --json x402guard-report.json )
+# We --exclude the ruleset files here because a SAST tool scanning its own
+# rule definitions matches its own example patterns.
 on:
   pull_request:
   push:
     branches: [main, master]
 
 jobs:
-  scan:
+  test-and-scan:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      # If x402guard is published to npm:  npx x402guard . --json x402guard.json
-      - name: Run x402guard
-        run: node bin/x402guard.js . --json x402guard-report.json
+      - name: Unit tests
+        run: node test/run.js
+      - name: Self-scan
+        run: node bin/x402guard.js . --json x402guard-report.json --exclude rules.js
       - name: Upload report
         if: always()
         uses: actions/upload-artifact@v4
