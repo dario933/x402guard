@@ -92,6 +92,25 @@
   .install .c{color:var(--accent2)}
   footer{padding:30px 0 60px;color:var(--dim);font-size:12px;text-align:center;border-top:1px solid var(--line)}
   .disclaim{font-size:11.5px;color:var(--dim);margin-top:10px}
+  .cta-band{margin:14px 0 0;background:linear-gradient(100deg,#241a52,#1a1438);border:1px solid var(--line);border-radius:12px;padding:14px 18px;display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+  .cta-band p{font-size:14px}.cta-band b{color:var(--accent2)}
+  .tiers{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:8px}
+  .tier{border:1px solid var(--line);background:var(--surface);border-radius:14px;padding:20px;display:flex;flex-direction:column}
+  .tier.featured{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 26px 60px -42px var(--accent)}
+  .tier .tag{font-size:11px;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:.5px}
+  .tier h3{font-size:17px;margin:6px 0 2px}
+  .price{font-size:25px;font-weight:800;margin:6px 0}
+  .price small{font-size:13px;color:var(--muted);font-weight:500}
+  .tier ul{list-style:none;margin:10px 0 16px;padding:0;font-size:13px;color:var(--muted)}
+  .tier li{padding:4px 0 4px 20px;position:relative}
+  .tier li:before{content:"✓";position:absolute;left:0;color:var(--good)}
+  .tier .btn,.tier .btn-ghost{margin-top:auto;text-align:center}
+  .btn-ghost{display:inline-block;border:1px solid var(--line);border-radius:10px;padding:11px 18px;font-size:14px;font-weight:700;color:var(--text);background:transparent;cursor:pointer;transition:border-color .2s}
+  .btn-ghost:hover{border-color:var(--accent)}
+  form.review{margin-top:16px;border:1px solid var(--line);background:var(--surface);border-radius:14px;padding:18px;max-width:540px}
+  form.review label{display:block;font-size:12px;color:var(--muted);margin:8px 0 4px}
+  form.review input,form.review textarea{width:100%;background:#0c0a1a;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:13px;font-family:inherit}
+  form.review textarea{min-height:72px;resize:vertical}
 </style>
 </head>
 <body>
@@ -102,7 +121,7 @@
       <a href="#grader">Grader</a>
       <a href="#checks">Checks</a>
       <a href="#why">Why</a>
-      <a href="#cli">CLI</a>
+      <a href="#pricing">Pricing</a>
     </div>
   </nav>
 
@@ -144,6 +163,11 @@
     <div id="out"></div>
   </div>
   <p class="disclaim">Heuristic static analysis — expect some false positives/negatives. It complements, it does not replace, a professional smart-contract / ZK audit.</p>
+
+  <div class="cta-band">
+    <p>Scored a <b>D</b> or <b>F</b>? Get a human expert to review your x402 integration — and write the fixes.</p>
+    <a class="btn" href="#book">Book a security review →</a>
+  </div>
 
   <!-- CHECKS -->
   <section id="checks">
@@ -190,6 +214,48 @@
     <p class="lead">Zero dependencies. Fails the build on any critical/high finding. Drop the GitHub Action into any repo that ships agent-payment code.</p>
     <div class="install"><span class="c">npx</span> x402guard ./your-project --html report.html</div>
     <p class="hint" style="margin-top:10px">Text / HTML / JSON reports · SARIF + runtime monitoring on the roadmap.</p>
+  </section>
+
+  <!-- PRICING -->
+  <section id="pricing">
+    <h2>Pricing</h2>
+    <p class="lead">The grader and CLI are free forever — they drive adoption. You pay when real money is on the line and you want a human in the loop.</p>
+    <div class="tiers">
+      <div class="tier">
+        <span class="tag">Free</span>
+        <h3>Grader + CLI</h3>
+        <div class="price">$0</div>
+        <ul><li>Unlimited web grades</li><li>Open-source CLI</li><li>GitHub Action / CI gate</li><li>15-rule x402 ruleset</li></ul>
+        <a class="btn-ghost" href="#grader">Scan now</a>
+      </div>
+      <div class="tier featured">
+        <span class="tag">Most popular</span>
+        <h3>Security Review</h3>
+        <div class="price">from $2,000 <small>one-time</small></div>
+        <ul><li>Expert review of your x402 + contracts</li><li>Prioritized report with concrete fixes</li><li>The person who finds it writes the fix</li><li>Free re-scan after remediation</li></ul>
+        <a class="btn" href="#book">Book a review →</a>
+      </div>
+      <div class="tier">
+        <span class="tag">Coming soon</span>
+        <h3>Continuous</h3>
+        <div class="price">from $199<small>/mo</small></div>
+        <ul><li>Private-repo CI scanning</li><li>Runtime monitoring (drain / replay alerts)</li><li>PR comments + dashboard</li><li>Early-access pricing locked in</li></ul>
+        <a class="btn-ghost" href="mailto:dario@dmeomaha.com?subject=x402guard%20Continuous%20early%20access">Join early access</a>
+      </div>
+    </div>
+
+    <h3 id="book" style="margin-top:30px;font-size:18px">Book a security review</h3>
+    <p class="lead">Tell me what you're shipping — I'll reply with scope and a fixed quote, usually same day.</p>
+    <form class="review" id="reviewForm">
+      <label for="rf-email">Your email</label>
+      <input type="email" id="rf-email" placeholder="you@company.com" required>
+      <label for="rf-repo">Repo or project URL</label>
+      <input type="text" id="rf-repo" placeholder="https://github.com/owner/name">
+      <label for="rf-msg">What do you want reviewed?</label>
+      <textarea id="rf-msg" placeholder="x402 endpoints, escrow contract, ZK verifier, treasury flow…"></textarea>
+      <button class="btn" type="submit" style="margin-top:14px">Send request →</button>
+      <p class="hint" style="margin-top:10px">Opens your email client to dario@dmeomaha.com. Prefer direct? <a href="mailto:dario@dmeomaha.com">dario@dmeomaha.com</a></p>
+    </form>
   </section>
 
   <footer>
@@ -273,6 +339,17 @@ async function scan(payload, btn) {
 $('#run-paste').addEventListener('click', e => scan({ code: code.value, filename: $('#lang').value }, e.target));
 $('#run-repo').addEventListener('click', e => scan({ repo: $('#repo').value }, e.target));
 $('#repo').addEventListener('keydown', e => { if (e.key === 'Enter') $('#run-repo').click(); });
+
+const rf = $('#reviewForm');
+if (rf) rf.addEventListener('submit', e => {
+  e.preventDefault();
+  const email = $('#rf-email').value.trim();
+  const repo = $('#rf-repo').value.trim();
+  const msg = $('#rf-msg').value.trim();
+  const subject = encodeURIComponent('x402guard security review request');
+  const body = encodeURIComponent('Email: ' + email + '\nRepo: ' + repo + '\n\n' + msg);
+  window.location.href = 'mailto:dario@dmeomaha.com?subject=' + subject + '&body=' + body;
+});
 </script>
 </body>
 </html>
