@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>x402guard — security scanner for x402 / agent-payment integrations</title>
+<meta name="description" content="Catch the agent-payment bugs general Solidity scanners miss: replay, allowance, idempotency, unauthenticated treasury broadcast, SSRF webhooks. Free grader.">
+<style>
+  :root{
+    --bg:#0b0a14; --bg2:#120f22; --surface:#171331; --surface2:#1e1840;
+    --line:#2a2350; --text:#eceaf6; --muted:#a79fce; --dim:#7d76a8;
+    --accent:#7c5cff; --accent2:#b08bff;
+    --crit:#ff5a4d; --high:#ff9a4d; --med:#ffd24d; --low:#8b93a7; --good:#3ddc84;
+    --radius:14px; --ease:cubic-bezier(.16,1,.3,1);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:radial-gradient(1200px 700px at 70% -10%,#231a4d 0%,var(--bg) 55%);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased}
+  a{color:var(--accent2);text-decoration:none}
+  .wrap{max-width:980px;margin:0 auto;padding:0 22px}
+  code,pre{font-family:"SF Mono",ui-monospace,Consolas,monospace}
+  nav{display:flex;align-items:center;justify-content:space-between;padding:20px 0}
+  .logo{font-size:20px;font-weight:800;letter-spacing:-.4px}
+  .logo b{color:var(--accent2)}
+  .nav-links{font-size:13px;color:var(--muted);display:flex;gap:20px}
+  .nav-links a{color:var(--muted)}.nav-links a:hover{color:var(--text)}
+
+  header.hero{padding:46px 0 26px;text-align:center}
+  .pill{display:inline-block;font-size:11.5px;font-weight:600;color:var(--accent2);
+    border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 13px;margin-bottom:20px}
+  h1{font-size:clamp(2rem,1.1rem+3.4vw,3.4rem);font-weight:800;letter-spacing:-1.3px;line-height:1.05}
+  h1 .grad{background:linear-gradient(100deg,var(--accent2),#6ad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{font-size:clamp(1rem,.9rem+.5vw,1.2rem);color:var(--muted);max-width:660px;margin:18px auto 0}
+
+  /* grader */
+  .grader{margin:34px 0 10px;background:linear-gradient(180deg,var(--surface),var(--bg2));
+    border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:0 30px 80px -40px #000}
+  .tabs{display:flex;border-bottom:1px solid var(--line)}
+  .tab{flex:1;padding:13px;font-size:13px;font-weight:600;color:var(--muted);background:transparent;border:0;cursor:pointer;transition:color .2s}
+  .tab[aria-selected="true"]{color:var(--text);box-shadow:inset 0 -2px 0 var(--accent)}
+  .panel{padding:18px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  textarea,input[type=text],select{width:100%;background:#0c0a1a;color:var(--text);border:1px solid var(--line);
+    border-radius:10px;padding:12px;font-size:13px;font-family:"SF Mono",ui-monospace,Consolas,monospace;resize:vertical}
+  textarea{min-height:190px;line-height:1.5}
+  input[type=text]{font-family:inherit}
+  select{width:auto;min-width:120px}
+  .btn{background:linear-gradient(100deg,var(--accent),#5b46c9);color:#fff;border:0;border-radius:10px;
+    padding:12px 22px;font-size:14px;font-weight:700;cursor:pointer;transition:transform .15s var(--ease),filter .2s;white-space:nowrap}
+  .btn:hover{transform:translateY(-1px);filter:brightness(1.08)}
+  .btn[disabled]{opacity:.6;cursor:wait;transform:none}
+  .hint{font-size:12px;color:var(--dim)}
+
+  /* results */
+  #out{display:none;border-top:1px solid var(--line);padding:18px}
+  .scorecard{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:14px}
+  .gletter{font-size:54px;font-weight:800;line-height:1;width:84px;height:84px;display:flex;align-items:center;justify-content:center;
+    border-radius:16px;border:1px solid var(--line);background:var(--surface2)}
+  .meta-s{font-size:13px;color:var(--muted)}
+  .meta-s b{color:var(--text)}
+  .counts span{display:inline-block;font-size:12px;font-weight:700;padding:3px 9px;border-radius:6px;margin-right:6px;margin-top:6px;color:#0b0a14}
+  .c-crit{background:var(--crit)}.c-high{background:var(--high)}.c-med{background:var(--med)}.c-low{background:var(--low);color:#fff}
+  .finding{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:10px;background:var(--surface)}
+  .finding .top{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .badge{font-size:10px;font-weight:800;padding:2px 8px;border-radius:5px;color:#0b0a14;letter-spacing:.3px}
+  .b-critical{background:var(--crit)}.b-high{background:var(--high)}.b-medium{background:var(--med)}.b-low{background:var(--low);color:#fff}
+  .finding code.loc{color:var(--accent2);font-size:12px}
+  .finding .rid{font-weight:700;font-size:12.5px}
+  .finding .ttl{margin-top:5px;font-size:13.5px}
+  .finding pre{margin-top:8px;background:#0c0a1a;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:11.5px;overflow-x:auto;color:#cfc8f0}
+  .finding .fix{margin-top:7px;font-size:12.5px;color:var(--muted)}
+  .finding .ref{margin-top:4px;font-size:11px;color:var(--dim)}
+  .clean{color:var(--good);font-weight:600}
+  .err{color:var(--crit);font-weight:600}
+
+  section{padding:40px 0;border-top:1px solid var(--line)}
+  h2{font-size:1.6rem;letter-spacing:-.5px;margin-bottom:6px}
+  .lead{color:var(--muted);max-width:680px;margin-bottom:18px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{font-size:12px;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 11px;color:var(--muted)}
+  .chip b{color:var(--text);font-weight:600}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:6px}
+  .card{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:16px}
+  .card h3{font-size:14px;margin-bottom:6px}.card p{font-size:13px;color:var(--muted)}
+  table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}
+  th{color:var(--dim);font-weight:600;font-size:12px}
+  td b{color:var(--text)}td{color:var(--muted)}
+  .install{background:#0c0a1a;border:1px solid var(--line);border-radius:10px;padding:14px 16px;font-size:13px;overflow-x:auto}
+  .install .c{color:var(--accent2)}
+  footer{padding:30px 0 60px;color:var(--dim);font-size:12px;text-align:center;border-top:1px solid var(--line)}
+  .disclaim{font-size:11.5px;color:var(--dim);margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <div class="logo">x402<b>guard</b></div>
+    <div class="nav-links">
+      <a href="#grader">Grader</a>
+      <a href="#checks">Checks</a>
+      <a href="#why">Why</a>
+      <a href="#cli">CLI</a>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <span class="pill">Security for the agent-payment economy</span>
+    <h1>Catch the bugs general scanners<br><span class="grad">never look for.</span></h1>
+    <p class="sub">x402guard checks the <b>web↔chain glue</b> of your x402 / agent-payment integration — replay, allowance, idempotency, unauthenticated treasury broadcast, SSRF webhooks. Slither checks your contract. We check everything around it.</p>
+  </header>
+
+  <!-- GRADER -->
+  <div class="grader" id="grader">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-mode="paste">Paste code</button>
+      <button class="tab" role="tab" aria-selected="false" data-mode="repo">Scan a GitHub repo</button>
+    </div>
+
+    <div class="panel" id="panel-paste">
+      <div class="row">
+        <span class="hint">Language:</span>
+        <select id="lang">
+          <option value="snippet.js">JavaScript / TS (x402 handler)</option>
+          <option value="snippet.sol">Solidity (.sol)</option>
+          <option value="snippet.py">Python (.py)</option>
+        </select>
+        <button class="btn" id="run-paste">Grade my code →</button>
+      </div>
+      <textarea id="code" spellcheck="false"></textarea>
+      <p class="hint" style="margin-top:8px">Runs entirely on the server with the same ruleset as the CLI. Nothing is stored.</p>
+    </div>
+
+    <div class="panel" id="panel-repo" style="display:none">
+      <div class="row">
+        <input type="text" id="repo" placeholder="https://github.com/owner/name (public repo)" style="flex:1;min-width:240px">
+        <button class="btn" id="run-repo">Scan repo →</button>
+      </div>
+      <p class="hint">Fetches up to 30 <code>.sol/.js/.ts/.py</code> files from a public repo and grades them. (Unauthenticated GitHub API — heavy use may rate-limit; paste mode always works.)</p>
+    </div>
+
+    <div id="out"></div>
+  </div>
+  <p class="disclaim">Heuristic static analysis — expect some false positives/negatives. It complements, it does not replace, a professional smart-contract / ZK audit.</p>
+
+  <!-- CHECKS -->
+  <section id="checks">
+    <h2>What it checks</h2>
+    <p class="lead">15 rules drawn from the <i>“Five Attacks on x402”</i> taxonomy and real-world escrow-audit findings — the integration-layer issues that contract-only tools skip.</p>
+    <div class="chips">
+      <span class="chip"><b>Unauthenticated treasury broadcast</b></span>
+      <span class="chip"><b>Replay</b> / missing nonce</span>
+      <span class="chip"><b>Idempotency</b> / double-settle</span>
+      <span class="chip"><b>Fail-open auth</b></span>
+      <span class="chip"><b>SSRF</b> webhooks</span>
+      <span class="chip"><b>Unlimited approvals</b></span>
+      <span class="chip"><b>Reentrancy</b> (CEI)</span>
+      <span class="chip"><b>tx.origin</b> owner</span>
+      <span class="chip">Raw ERC20</span>
+      <span class="chip">Hardcoded keys</span>
+      <span class="chip">Weak randomness</span>
+      <span class="chip">Stack-trace leaks</span>
+    </div>
+  </section>
+
+  <!-- WHY -->
+  <section id="why">
+    <h2>Why this matters now</h2>
+    <p class="lead">Agent-payment code moves real USDC over a brand-new attack surface — and money is already being lost.</p>
+    <div class="grid">
+      <div class="card"><h3>Real exploits, today</h3><p>GoPlus flagged critical vulns in x402-based tokens after exploits drained USDC from <b>200+ wallets</b>.</p></div>
+      <div class="card"><h3>A known attack class</h3><p>The academic taxonomy is published — <i>“Five Attacks on x402”</i>: replay, allowance bypass, web-layer idempotency, authorization binding.</p></div>
+      <div class="card"><h3>The audit gap</h3><p><b>80%+</b> of deployed contracts never get a professional audit. The integration layer gets even less scrutiny.</p></div>
+    </div>
+
+    <h2 style="margin-top:30px">Where it fits</h2>
+    <table>
+      <tr><th>Tool</th><th>Checks</th><th>Misses</th></tr>
+      <tr><td><b>Slither / MythX</b></td><td>Solidity contract internals</td><td>the x402 web↔chain glue</td></tr>
+      <tr><td><b>OZ Defender / Forta</b></td><td>runtime monitoring (general)</td><td>x402-specific flows</td></tr>
+      <tr><td><b>x402guard</b></td><td><b>the integration layer</b>, in CI</td><td>(complements a full audit)</td></tr>
+    </table>
+  </section>
+
+  <!-- CLI -->
+  <section id="cli">
+    <h2>Run it in CI</h2>
+    <p class="lead">Zero dependencies. Fails the build on any critical/high finding. Drop the GitHub Action into any repo that ships agent-payment code.</p>
+    <div class="install"><span class="c">npx</span> x402guard ./your-project --html report.html</div>
+    <p class="hint" style="margin-top:10px">Text / HTML / JSON reports · SARIF + runtime monitoring on the roadmap.</p>
+  </section>
+
+  <footer>
+    x402guard · heuristic SAST for x402 / agent-payment integrations · MIT.<br>
+    Not a substitute for a professional audit.
+  </footer>
+</div>
+
+<script>
+const SAMPLE = `// Paste your x402 settlement handler, escrow contract, or any integration code.
+import { ethers } from 'ethers';
+
+export default async function handler(req, res) {
+  try {
+    // no signature / HMAC check — anyone hitting this endpoint moves treasury funds
+    const requestId = 'req_' + Math.random().toString(36).slice(2);
+    const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
+    const treasury = new ethers.Wallet(process.env.TREASURY_PRIVATE_KEY, provider);
+    const tx = await treasury.sendTransaction({ to: req.body.to, value: req.body.amount });
+    return res.json({ requestId, hash: tx.hash });
+  } catch (e) {
+    return res.status(500).json({ error: e.stack }); // leaks internals
+  }
+}`;
+
+const $ = s => document.querySelector(s);
+const code = $('#code'); code.value = SAMPLE;
+const out = $('#out');
+
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.setAttribute('aria-selected', x === t));
+  const mode = t.dataset.mode;
+  $('#panel-paste').style.display = mode === 'paste' ? '' : 'none';
+  $('#panel-repo').style.display = mode === 'repo' ? '' : 'none';
+}));
+
+const sevColor = { critical: 'var(--crit)', high: 'var(--high)', medium: 'var(--med)', low: 'var(--low)' };
+const letterColor = l => l === 'A' ? 'var(--good)' : l === 'B' ? '#6ad' : l === 'F' ? 'var(--crit)' : 'var(--high)';
+const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+function render(r) {
+  out.style.display = 'block';
+  if (r.error) { out.innerHTML = '<p class="err">⚠ ' + esc(r.error) + '</p>'; return; }
+  const c = r.counts;
+  let html = '<div class="scorecard">' +
+    '<div class="gletter" style="color:' + letterColor(r.letter) + '">' + r.letter + '</div>' +
+    '<div><div class="meta-s">grade <b>' + r.score + '/100</b> · source <b>' + esc(r.source || '') + '</b> · ' + r.filesScanned + ' file(s) · ' + r.ruleCount + ' rules</div>' +
+    '<div class="counts"><span class="c-crit">' + c.critical + ' critical</span><span class="c-high">' + c.high + ' high</span><span class="c-med">' + c.medium + ' medium</span><span class="c-low">' + c.low + ' low</span></div>' +
+    (r.truncated ? '<div class="hint" style="margin-top:6px">Showing first ' + r.filesScanned + ' of ' + r.totalCandidates + ' scannable files.</div>' : '') +
+    '</div></div>';
+  if (!r.findings.length) {
+    html += '<p class="clean">✓ No findings from the current ruleset. (Still not a substitute for a professional audit.)</p>';
+  } else {
+    for (const f of r.findings) {
+      html += '<div class="finding"><div class="top">' +
+        '<span class="badge b-' + f.severity + '">' + f.severity.toUpperCase() + '</span>' +
+        '<span class="rid">' + esc(f.ruleId) + '</span>' +
+        '<code class="loc">' + esc(f.file) + ':' + f.line + '</code></div>' +
+        '<div class="ttl">' + esc(f.title) + '</div>' +
+        (f.snippet ? '<pre>' + esc(f.snippet) + '</pre>' : '') +
+        '<div class="fix">→ ' + esc(f.fix) + '</div>' +
+        (f.ref ? '<div class="ref">' + esc(f.ref) + '</div>' : '') +
+        '</div>';
+    }
+  }
+  out.innerHTML = html;
+}
+
+async function scan(payload, btn) {
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Scanning…';
+  out.style.display = 'block'; out.innerHTML = '<p class="hint">Scanning…</p>';
+  try {
+    const r = await fetch('/api/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    render(await r.json());
+  } catch (e) {
+    render({ error: 'Network error — please try again.' });
+  } finally { btn.disabled = false; btn.textContent = label; }
+}
+
+$('#run-paste').addEventListener('click', e => scan({ code: code.value, filename: $('#lang').value }, e.target));
+$('#run-repo').addEventListener('click', e => scan({ repo: $('#repo').value }, e.target));
+$('#repo').addEventListener('keydown', e => { if (e.key === 'Enter') $('#run-repo').click(); });
+</script>
+</body>
+</html>
