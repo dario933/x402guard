@@ -1,0 +1,14 @@
+node_modules/
+*.log
+npm-debug.log*
+
+# scan outputs (don't commit reports of other people's repos)
+scan-*.html
+scan-*.json
+x402guard-report.*
+
+# build / temp
+*.tgz
+_*.png
+.DS_Store
+.vercel

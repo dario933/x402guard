@@ -1,0 +1,25 @@
+name: x402guard
+# Drop this into any repo that ships x402 / agent-payment code.
+# Fails the build on any critical/high finding.
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # If x402guard is published to npm:  npx x402guard . --json x402guard.json
+      - name: Run x402guard
+        run: node bin/x402guard.js . --json x402guard-report.json
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: x402guard-report
+          path: x402guard-report.json
