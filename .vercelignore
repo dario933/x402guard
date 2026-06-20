@@ -1,0 +1,13 @@
+# Only the web app (index.html + api/) and vercel.json need to deploy.
+# Keep source, CLI, tests, and fixtures OUT of the public deployment so they
+# aren't served as static files.
+src/
+bin/
+test/
+__fixtures__/
+.github/
+README.md
+LICENSE
+*.tgz
+scan-*.html
+scan-*.json

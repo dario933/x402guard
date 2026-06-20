@@ -12,3 +12,5 @@ x402guard-report.*
 _*.png
 .DS_Store
 .vercel
+
+.vercel

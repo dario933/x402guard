@@ -1,7 +1,8 @@
 'use strict';
 // In-memory scan engine for the hosted grader. Reuses the SAME ruleset as the
 // CLI (../src/rules.js) so the web grade and the CLI grade never diverge.
-const rules = require('../src/rules.js');
+// require the vendored copy so src/ can be excluded from the public deployment
+const rules = require('./_rules.js');
 
 const EXT = { '.sol': 'sol', '.js': 'js', '.jsx': 'js', '.ts': 'js', '.tsx': 'js', '.mjs': 'js', '.cjs': 'js', '.py': 'py' };
 const SEVERITY_WEIGHT = { critical: 35, high: 12, medium: 4, low: 1 };
