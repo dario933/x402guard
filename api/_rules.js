@@ -11,7 +11,7 @@ const code = ctx => ctx.code || ctx.text;                 // comment-stripped so
 const inApi = ctx => /(^|\/)api\//.test(rel(ctx));
 const inContracts = ctx => /(^|\/)contracts\//.test(rel(ctx));
 // CLI tools / SDKs / examples / deploy scripts legitimately hold keys — not server endpoints.
-const isClientSide = ctx => /(^|\/)(bin|sdk|examples?|scripts?|script|tests?|mocks?)\//.test(rel(ctx));
+const isClientSide = ctx => /(^|\/)(bin|sdk|examples?|scripts?|script|tests?|e2e|mocks?)\//.test(rel(ctx));
 const isHandler = ctx =>
   inApi(ctx) ||
   /export\s+default\s+(async\s+)?function|module\.exports\s*=\s*async|\(\s*req\s*,\s*res\s*\)|res\.(status|json|send)\(/.test(code(ctx));
@@ -80,12 +80,31 @@ module.exports = [
     fix: 'Move to environment variables / a secret manager. Purge from git history (git filter-repo / BFG). Rotate anything real.',
     ref: 'AWM audit C6; CWE-798',
     detect(ctx) {
+      const p = (ctx.rel || ctx.path).replace(/\\/g, '/');
+      // skip test scaffolding — committed keys there are almost always dummies
+      if (/\.(test|spec)\.[a-z]+$|(^|\/)(tests?|e2e|mocks?|__tests__|__fixtures__|fixtures)\//i.test(p)) return [];
+      // obvious placeholder keys (zero, sequential, all-same-char) + well-known Anvil/Hardhat defaults
+      const DUMMY = /^0+1?$|^(0123456789|1234567890){2,}|^(.)\1{30,}$|deadbeef/i;
+      const ANVIL = /ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80|59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d|5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a/i;
       const out = [];
       for (let i = 0; i < ctx.lines.length; i++) {
         const l = ctx.lines[i];
         const m = l.match(/["'`]0x([0-9a-fA-F]{64})["'`]/);
-        if (m) { if (/^0+$/.test(m[1])) continue; out.push({ line: i + 1, snippet: l.trim().slice(0, 150) }); continue; }
-        if (/sk_live_[0-9a-zA-Z]{10,}|BEGIN [A-Z ]*PRIVATE KEY|mnemonic\s*[:=]\s*["'`]/.test(l)) out.push({ line: i + 1, snippet: l.trim().slice(0, 150) });
+        if (m) {
+          const hex = m[1];
+          if (/^0+$/.test(hex) || DUMMY.test(hex) || ANVIL.test(hex)) continue;
+          // a 64-hex literal is only a *private key* if the context says so — otherwise
+          // it's an event topic / keccak hash / merkle root / salt / selector (all public).
+          const keyish = /(private[_ ]?key|privkey|secret|mnemonic|signer|deployer|\bpk\b|\bwallet\b|account|fromprivatekey|new\s+ethers\.wallet|privatekeytoaccount)/i.test(l);
+          const hashish = /(event|topic|hash|root|selector|domain|salt|\bsig\b|signature|digest|merkle|commit|typehash|abi|interface)/i.test(l);
+          if (!keyish || hashish) continue;
+          out.push({ line: i + 1, snippet: l.trim().slice(0, 150) });
+          continue;
+        }
+        if (/sk_live_[0-9a-zA-Z]{10,}|BEGIN [A-Z ]*PRIVATE KEY/.test(l)) { out.push({ line: i + 1, snippet: l.trim().slice(0, 150) }); continue; }
+        // mnemonic: only flag real-looking phrases (12+ words, not placeholders)
+        const mm = l.match(/mnemonic\s*[:=]\s*["'`]([^"'`]+)["'`]/i);
+        if (mm && mm[1].trim().split(/\s+/).length >= 12 && !/word1|word2|\.\.\.|…|xxx|your[_ ]|example|test test|abandon abandon/i.test(mm[1])) out.push({ line: i + 1, snippet: l.trim().slice(0, 150) });
       }
       return out;
     }
