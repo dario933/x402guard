@@ -61,8 +61,29 @@ async function fetchRepoFiles({ owner, repo }) {
   return { files, branch, truncated: all.length > MAX_REPO_FILES, totalCandidates: all.length };
 }
 
+// Rate limiting via Upstash Redis REST (no npm dependency). No-op until configured
+// (set UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN in the Vercel project env).
+// Fail-open: any limiter error never blocks a legitimate scan.
+const RL_WINDOW = 600;   // seconds
+const RL_LIMIT = 30;     // requests per window per IP
+async function rateLimited(req) {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) return false; // not configured -> open
+  const ip = (req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown').toString().split(',')[0].trim();
+  const key = `x402guard:rl:${ip}`;
+  const h = { Authorization: `Bearer ${token}` };
+  try {
+    const r = await fetch(`${url}/incr/${encodeURIComponent(key)}`, { headers: h, signal: AbortSignal.timeout(2000) });
+    const n = (await r.json()).result;
+    if (n === 1) await fetch(`${url}/expire/${encodeURIComponent(key)}/${RL_WINDOW}`, { headers: h, signal: AbortSignal.timeout(2000) });
+    return typeof n === 'number' && n > RL_LIMIT;
+  } catch { return false; } // limiter down -> don't break the grader
+}
+
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return send(res, 405, { error: 'POST only' });
+  if (await rateLimited(req)) return send(res, 429, { error: 'Rate limit exceeded — please slow down and try again in a few minutes.' });
   let body;
   try { body = await readBody(req); } catch (e) { if (e && e.message === 'toobig') return send(res, 413, { error: 'Body too large' }); return send(res, 400, { error: 'Invalid JSON body' }); }
 
