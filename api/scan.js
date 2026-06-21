@@ -21,22 +21,27 @@ const send = (res, status, obj) => {
 };
 
 async function readBody(req) {
-  if (req.body) return typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+  if (req.body !== undefined && req.body !== null) {
+    if (typeof req.body === 'string') { try { return JSON.parse(req.body); } catch { throw new Error('badjson'); } }
+    return req.body;
+  }
   return await new Promise((resolve, reject) => {
-    let d = '';
-    req.on('data', c => { d += c; if (d.length > MAX_BODY) req.destroy(); });
-    req.on('end', () => { try { resolve(d ? JSON.parse(d) : {}); } catch (e) { reject(e); } });
-    req.on('error', reject);
+    const chunks = []; let size = 0;
+    req.on('data', c => { size += c.length; if (size > MAX_BODY) { req.destroy(); reject(new Error('toobig')); return; } chunks.push(c); });
+    req.on('end', () => { try { const s = Buffer.concat(chunks).toString('utf8'); resolve(s ? JSON.parse(s) : {}); } catch { reject(new Error('badjson')); } });
+    req.on('error', () => reject(new Error('stream')));
   });
 }
 
 function parseRepo(url) {
   const m = /^https?:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/.exec((url || '').trim());
-  return m ? { owner: m[1], repo: m[2] } : null;
+  if (!m) return null;
+  if ([m[1], m[2]].some(s => s === '.' || s === '..')) return null; // no path traversal on api.github.com
+  return { owner: m[1], repo: m[2] };
 }
 
 async function gh(path) {
-  const r = await fetch('https://api.github.com' + path, { headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'x402guard-grader' } });
+  const r = await fetch('https://api.github.com' + path, { headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'x402guard-grader' }, signal: AbortSignal.timeout(8000) });
   if (r.status === 403) throw new Error('ratelimit');
   if (!r.ok) throw new Error('gh-' + r.status);
   return r.json();
@@ -48,20 +53,18 @@ async function fetchRepoFiles({ owner, repo }) {
   const tree = await gh(`/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`);
   const all = (tree.tree || []).filter(n => n.type === 'blob' && EXT[extOf(n.path)] && !SKIP_DIR.test('/' + n.path) && (n.size || 0) < 300000);
   const wanted = all.slice(0, MAX_REPO_FILES);
-  const files = [];
-  for (const n of wanted) {
-    try {
-      const raw = await fetch(`https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${n.path}`, { headers: { 'User-Agent': 'x402guard-grader' } });
-      if (raw.ok) files.push({ path: n.path, text: await raw.text() });
-    } catch { /* skip unreadable file */ }
-  }
+  const settled = await Promise.allSettled(wanted.map(async n => {
+    const raw = await fetch(`https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${n.path}`, { headers: { 'User-Agent': 'x402guard-grader' }, signal: AbortSignal.timeout(8000) });
+    return raw.ok ? { path: n.path, text: await raw.text() } : null;
+  }));
+  const files = settled.filter(s => s.status === 'fulfilled' && s.value).map(s => s.value);
   return { files, branch, truncated: all.length > MAX_REPO_FILES, totalCandidates: all.length };
 }
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return send(res, 405, { error: 'POST only' });
   let body;
-  try { body = await readBody(req); } catch { return send(res, 400, { error: 'Invalid JSON body' }); }
+  try { body = await readBody(req); } catch (e) { if (e && e.message === 'toobig') return send(res, 413, { error: 'Body too large' }); return send(res, 400, { error: 'Invalid JSON body' }); }
 
   try {
     if (body.repo) {

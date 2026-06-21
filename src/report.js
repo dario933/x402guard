@@ -53,14 +53,14 @@ function renderText(r, target) {
 
 function renderJson(r) { return JSON.stringify(r, null, 2); }
 
-function esc(s) { return String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
 function renderHtml(r, target) {
   const sevc = { critical: '#b3261e', high: '#e0701d', medium: '#d9a72a', low: '#6b7688' };
   const gradeColor = r.letter === 'A' ? '#2e9e5b' : r.letter === 'B' ? '#2f80b3' : r.letter === 'F' ? '#b3261e' : '#e0701d';
   const rows = r.findings.map(f => `
     <tr>
-      <td><span class="badge" style="background:${sevc[f.severity]}">${f.severity.toUpperCase()}</span></td>
+      <td><span class="badge" style="background:${sevc[f.severity] || '#6b7688'}">${esc(f.severity).toUpperCase()}</span></td>
       <td><code>${esc(f.ruleId)}</code><div class="ttl">${esc(f.title)}</div></td>
       <td><code>${esc(f.file)}:${f.line}</code>${f.snippet ? `<pre>${esc(f.snippet)}</pre>` : ''}</td>
       <td>${esc(f.fix)}${f.ref ? `<div class="ref">${esc(f.ref)}</div>` : ''}</td>

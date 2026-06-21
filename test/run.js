@@ -27,6 +27,13 @@ const safeHits = r.findings.filter(f => /safe-handler/.test(f.file));
 if (safeHits.length === 0) console.log('  ok    hardened handler is clean (no false positives)');
 else { console.error('  FAIL  safe-handler.js should be clean, got: ' + safeHits.map(f => f.ruleId).join(', ')); failed++; }
 
+// Drift guard: the hosted grader vendors src/rules.js into api/_rules.js — they must match.
+const fs = require('fs');
+const srcRules = fs.readFileSync(path.join(__dirname, '..', 'src', 'rules.js'), 'utf8');
+const vendored = fs.readFileSync(path.join(__dirname, '..', 'api', '_rules.js'), 'utf8').replace(/^[^\n]*\n/, '');
+if (srcRules === vendored) console.log('  ok    vendored api/_rules.js in sync with src/rules.js');
+else { console.error('  FAIL  api/_rules.js is OUT OF SYNC with src/rules.js — re-vendor it'); failed++; }
+
 console.log('');
 if (failed) { console.error(failed + ' test(s) failed'); process.exit(1); }
 console.log('All tests passed (' + r.findings.length + ' findings across fixtures).');

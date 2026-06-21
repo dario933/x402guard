@@ -294,26 +294,29 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () =>
 
 const sevColor = { critical: 'var(--crit)', high: 'var(--high)', medium: 'var(--med)', low: 'var(--low)' };
 const letterColor = l => l === 'A' ? 'var(--good)' : l === 'B' ? '#6ad' : l === 'F' ? 'var(--crit)' : 'var(--high)';
-const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const num = n => esc(String(Number.isFinite(+n) ? +n : 0));
+const sevOf = s => ['critical', 'high', 'medium', 'low'].includes(s) ? s : 'low';
 
 function render(r) {
   out.style.display = 'block';
   if (r.error) { out.innerHTML = '<p class="err">⚠ ' + esc(r.error) + '</p>'; return; }
-  const c = r.counts;
+  const c = r.counts || { critical: 0, high: 0, medium: 0, low: 0 };
   let html = '<div class="scorecard">' +
-    '<div class="gletter" style="color:' + letterColor(r.letter) + '">' + r.letter + '</div>' +
-    '<div><div class="meta-s">grade <b>' + r.score + '/100</b> · source <b>' + esc(r.source || '') + '</b> · ' + r.filesScanned + ' file(s) · ' + r.ruleCount + ' rules</div>' +
-    '<div class="counts"><span class="c-crit">' + c.critical + ' critical</span><span class="c-high">' + c.high + ' high</span><span class="c-med">' + c.medium + ' medium</span><span class="c-low">' + c.low + ' low</span></div>' +
-    (r.truncated ? '<div class="hint" style="margin-top:6px">Showing first ' + r.filesScanned + ' of ' + r.totalCandidates + ' scannable files.</div>' : '') +
+    '<div class="gletter" style="color:' + letterColor(r.letter) + '">' + esc(r.letter) + '</div>' +
+    '<div><div class="meta-s">grade <b>' + num(r.score) + '/100</b> · source <b>' + esc(r.source || '') + '</b> · ' + num(r.filesScanned) + ' file(s) · ' + num(r.ruleCount) + ' rules</div>' +
+    '<div class="counts"><span class="c-crit">' + num(c.critical) + ' critical</span><span class="c-high">' + num(c.high) + ' high</span><span class="c-med">' + num(c.medium) + ' medium</span><span class="c-low">' + num(c.low) + ' low</span></div>' +
+    (r.truncated ? '<div class="hint" style="margin-top:6px">Showing first ' + num(r.filesScanned) + ' of ' + num(r.totalCandidates) + ' scannable files.</div>' : '') +
     '</div></div>';
-  if (!r.findings.length) {
+  if (!r.findings || !r.findings.length) {
     html += '<p class="clean">✓ No findings from the current ruleset. (Still not a substitute for a professional audit.)</p>';
   } else {
     for (const f of r.findings) {
+      const sev = sevOf(f.severity);
       html += '<div class="finding"><div class="top">' +
-        '<span class="badge b-' + f.severity + '">' + f.severity.toUpperCase() + '</span>' +
+        '<span class="badge b-' + sev + '">' + esc(sev.toUpperCase()) + '</span>' +
         '<span class="rid">' + esc(f.ruleId) + '</span>' +
-        '<code class="loc">' + esc(f.file) + ':' + f.line + '</code></div>' +
+        '<code class="loc">' + esc(f.file) + ':' + num(f.line) + '</code></div>' +
         '<div class="ttl">' + esc(f.title) + '</div>' +
         (f.snippet ? '<pre>' + esc(f.snippet) + '</pre>' : '') +
         '<div class="fix">→ ' + esc(f.fix) + '</div>' +

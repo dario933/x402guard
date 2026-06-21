@@ -1,5 +1,6 @@
 // VENDORED COPY of src/rules.js for the serverless deployment — keep in sync with the CLI ruleset.
 'use strict';
+// x402guard-disable-file — this file documents vulnerable example patterns; the scanner skips it.
 // x402guard ruleset — focused on the x402 / agent-payment INTEGRATION layer
 // (the web<->chain glue) that general Solidity scanners (Slither/MythX) miss,
 // plus the bug classes from "Five Attacks on x402" (arXiv:2605.11781) and
@@ -121,9 +122,9 @@ module.exports = [
       if (!isHandler(ctx) || isClientSide(ctx)) return [];
       const t = code(ctx);
       if (!/x402|settle|consume|receipt|redeem|release|payout/i.test(rel(ctx) + t)) return [];
-      if (!/safeTransfer|sendTransaction|markPaid|payout|release\(|setPro|writeContract/i.test(t)) return [];
+      if (!/safeTransfer|sendTransaction|writeContract|\bmarkPaid\b|\bpayout\b|release\s*\(/i.test(t)) return [];
       if (/nonce|idempoten|already(Used|Processed|Settled)|usedDigest|jti|dedup|seen[A-Z]|replay/i.test(t)) return [];
-      return firstLine(ctx.lines, /safeTransfer|sendTransaction|markPaid|payout|release\(/);
+      return firstLine(ctx.lines, /safeTransfer|sendTransaction|writeContract|\bmarkPaid\b|\bpayout\b|release\s*\(/i);
     }
   },
   {
@@ -137,9 +138,9 @@ module.exports = [
       const t = code(ctx);
       if (!/webhook|callback/i.test(rel(ctx) + t)) return [];
       if (!/(req|request)\.(body|query)/.test(t)) return [];
-      if (!/safeTransfer|sendTransaction|markPaid|fulfil|deliver|payout|setPro|writeContract/i.test(t)) return [];
+      if (!/safeTransfer|sendTransaction|writeContract|\bmarkPaid\b|\bfulfil|\bdeliver\b|\bpayout\b/i.test(t)) return [];
       if (/idempoten|exactly.?once|already(Processed|Delivered|Settled)|processedSet|dedup|usedDigest|nonce/i.test(t)) return [];
-      return firstLine(ctx.lines, /webhook|callback/i);
+      return firstLine(ctx.lines, /safeTransfer|sendTransaction|writeContract|\bmarkPaid\b|\bfulfil|\bdeliver\b|\bpayout\b/i);
     }
   },
   {
@@ -193,7 +194,7 @@ module.exports = [
     why: 'Some tokens (USDT-style) do not return a bool; a raw .transfer can silently fail. Use SafeERC20.',
     fix: 'Use OpenZeppelin SafeERC20 (safeTransfer / safeTransferFrom).',
     ref: 'SWC-104',
-    detect(ctx) { if (!inContracts(ctx)) return []; return linesMatching(ctx.lines, /(?<![a-zA-Z])\.transferFrom?\(/); }
+    detect(ctx) { if (!inContracts(ctx)) return []; return linesMatching(ctx.lines, /\.transfer(From)?\s*\(/); }
   },
   {
     id: 'SOL-UNLIMITED-APPROVAL', severity: 'medium', category: 'allowance (Five Attacks #III)', langs: ['sol', 'js'],

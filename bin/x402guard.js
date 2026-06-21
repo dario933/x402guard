@@ -10,9 +10,9 @@ function main() {
   let target = '.', htmlOut = null, jsonOut = null, ciGate = true, excludes = [];
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
-    if (a === '--html') htmlOut = args[++i];
-    else if (a === '--json') jsonOut = args[++i];
-    else if (a === '--exclude') excludes = (args[++i] || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (a === '--html') { htmlOut = args[++i]; if (!htmlOut) { console.error('x402guard: --html requires a file path'); process.exit(2); } }
+    else if (a === '--json') { jsonOut = args[++i]; if (!jsonOut) { console.error('x402guard: --json requires a file path'); process.exit(2); } }
+    else if (a === '--exclude') excludes = (args[++i] || '').split(',').map(s => s.trim().replace(/\\/g, '/')).filter(Boolean);
     else if (a === '--no-gate') ciGate = false;
     else if (a === '-h' || a === '--help') {
       console.log(`x402guard — security scanner for x402 / agent-payment integrations

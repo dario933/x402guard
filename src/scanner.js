@@ -42,11 +42,15 @@ function scan(target, opts = {}) {
     let text;
     try { text = fs.readFileSync(file, 'utf8'); } catch { continue; }
     if (text.length > MAX_BYTES) continue;
+    if (/x402guard-disable-file/.test(text.slice(0, 4000))) continue; // opt-out sentinel
     const lines = text.split(/\r?\n/);
     const lang = EXT[path.extname(file)];
     // comment-stripped copy: mitigation/keyword checks run against this so a
     // comment ("// we verify the HMAC here") can't hide a real vulnerability.
-    const code = text.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    // Block comments are replaced with the same number of newlines to preserve line counts.
+    const code = text
+      .replace(/\/\*[\s\S]*?\*\//g, m => ' ' + '\n'.repeat((m.match(/\n/g) || []).length))
+      .replace(/(^|[^:])\/\/.*$/gm, '$1');
     const ctx = { text, code, lines, path: file, rel: relPath, lang };
     for (const rule of rules) {
       if (rule.langs && !rule.langs.includes(lang)) continue;

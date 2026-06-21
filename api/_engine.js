@@ -6,14 +6,16 @@ const rules = require('./_rules.js');
 
 const EXT = { '.sol': 'sol', '.js': 'js', '.jsx': 'js', '.ts': 'js', '.tsx': 'js', '.mjs': 'js', '.cjs': 'js', '.py': 'py' };
 const SEVERITY_WEIGHT = { critical: 35, high: 12, medium: 4, low: 1 };
-const MAX_FILE_BYTES = 400000;
+const MAX_FILE_BYTES = 800000; // keep in sync with src/scanner.js MAX_BYTES
 
 const extOf = p => { const m = /\.[a-z]+$/i.exec(p || ''); return m ? m[0].toLowerCase() : ''; };
 
 function buildCtx(p, text) {
   const lang = EXT[extOf(p)] || 'js';
   const lines = text.split(/\r?\n/);
-  const code = text.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  const code = text
+    .replace(/\/\*[\s\S]*?\*\//g, m => ' ' + '\n'.repeat((m.match(/\n/g) || []).length))
+    .replace(/(^|[^:])\/\/.*$/gm, '$1');
   return { text, code, lines, path: p, rel: p, lang };
 }
 
