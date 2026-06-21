@@ -87,6 +87,8 @@ async function rateState(req) {
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return send(res, 405, { error: 'POST only' });
   const rl = await rateState(req);
+  res.setHeader('X-RL-Configured', String(!!rl.configured));
+  if (rl.error) res.setHeader('X-RL-Error', '1');
   if (rl.configured && typeof rl.count === 'number') {
     res.setHeader('X-RateLimit-Limit', RL_LIMIT);
     res.setHeader('X-RateLimit-Remaining', Math.max(0, RL_LIMIT - rl.count));
