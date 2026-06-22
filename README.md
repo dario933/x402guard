@@ -4,7 +4,7 @@
 
 Zero dependencies. Runs anywhere Node ≥18 runs. CLI + GitHub Action + HTML/JSON reports.
 
-**▶ Try it now, no install:** paste a contract or endpoint at **[x402guard.vercel.app](https://x402guard.vercel.app)** for an instant security grade.
+**▶ Try it now, no install:** paste a contract or endpoint at **[x402guard.io](https://x402guard.io)** for an instant security grade.
 
 ```bash
 npx x402guard ./my-x402-project --html report.html
