@@ -4,8 +4,10 @@
 
 Zero dependencies. Runs anywhere Node ≥18 runs. CLI + GitHub Action + HTML/JSON reports.
 
+**▶ Try it now, no install:** paste a contract or endpoint at **[x402guard.vercel.app](https://x402guard.vercel.app)** for an instant security grade.
+
 ```bash
-node bin/x402guard.js ./my-x402-project --html report.html
+npx x402guard ./my-x402-project --html report.html
 ```
 
 ---
@@ -67,13 +69,13 @@ It automatically reproduced the headline findings of a manual audit, including a
 
 ```bash
 # scan a directory, fail CI on critical/high
-node bin/x402guard.js .
+npx x402guard .
 
 # write reports
-node bin/x402guard.js . --html report.html --json report.json
+npx x402guard . --html report.html --json report.json
 
 # don't fail the build (report-only)
-node bin/x402guard.js . --no-gate
+npx x402guard . --no-gate
 ```
 
 Exit code is `1` when any critical/high finding is present (CI gate), else `0`.
