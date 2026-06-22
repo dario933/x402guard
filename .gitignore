@@ -7,6 +7,10 @@ scan-*.html
 scan-*.json
 x402guard-report.*
 
+# internal launch/strategy docs (never publish)
+LAUNCH.md
+OUTREACH.md
+
 # build / temp
 *.tgz
 _*.png
