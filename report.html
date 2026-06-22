@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The State of x402 Security — June 2026 | x402guard</title>
+<meta name="description" content="We scanned 23 live x402 / agent-payment repos with x402guard. 61% were clean and there were zero criticals — but error-leaks are everywhere and the tail is dangerous. The data, anonymized.">
+<link rel="canonical" href="https://x402guard.io/report.html">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://x402guard.io/report.html">
+<meta property="og:title" content="The State of x402 Security — June 2026">
+<meta property="og:description" content="23 live x402 repos, scanned. 61% clean, zero criticals — but stack-trace leaks are everywhere and one repo carried 4 high-severity issues. The web↔chain glue is where x402 breaks.">
+<meta property="og:image" content="https://img-host-dme1.vercel.app/x402guard.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="The State of x402 Security — June 2026">
+<meta name="twitter:description" content="23 live x402 repos scanned: 61% clean, 0 criticals, but error-leaks everywhere and a dangerous tail.">
+<meta name="twitter:image" content="https://img-host-dme1.vercel.app/x402guard.png">
+<style>
+  :root{--bg:#0b0a14;--bg2:#120f22;--surface:#171331;--surface2:#1e1840;--line:#2a2350;--text:#eceaf6;--muted:#a79fce;--dim:#7d76a8;--accent:#7c5cff;--accent2:#b08bff;--crit:#ff5a4d;--high:#ff9a4d;--med:#ffd24d;--good:#3ddc84;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:radial-gradient(1200px 700px at 70% -10%,#231a4d 0%,var(--bg) 55%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;line-height:1.65;-webkit-font-smoothing:antialiased}
+  a{color:var(--accent2);text-decoration:none}a:hover{text-decoration:underline}
+  .wrap{max-width:760px;margin:0 auto;padding:0 22px}
+  code{font-family:"SF Mono",ui-monospace,Consolas,monospace;background:#0c0a1a;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:.9em;color:var(--accent2)}
+  nav{display:flex;align-items:center;justify-content:space-between;padding:20px 0}
+  .logo{font-size:20px;font-weight:800;letter-spacing:-.4px}.logo b{color:var(--accent2)}
+  .nav-links a{color:var(--muted);font-size:13px;margin-left:18px}
+  header{padding:40px 0 10px}
+  .kicker{font-size:12px;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:1px}
+  h1{font-size:clamp(2rem,1.2rem+3vw,3.1rem);font-weight:800;letter-spacing:-1.4px;line-height:1.07;margin:10px 0}
+  .byline{color:var(--dim);font-size:14px}
+  .lede{font-size:1.18rem;color:var(--muted);margin:20px 0 6px}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:30px 0}
+  .stat{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:16px}
+  .stat .n{font-size:32px;font-weight:800;line-height:1;letter-spacing:-1px}
+  .stat .l{font-size:12.5px;color:var(--muted);margin-top:7px}
+  .g{color:var(--good)}.o{color:var(--high)}.r{color:var(--crit)}.p{color:var(--accent2)}
+  h2{font-size:1.5rem;letter-spacing:-.5px;margin:38px 0 10px;padding-top:24px;border-top:1px solid var(--line)}
+  p{margin:12px 0;color:#d6d2ea}
+  .rule-list{list-style:none;margin:14px 0}
+  .rule-list li{display:flex;align-items:baseline;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14.5px}
+  .rule-list .bar{flex:0 0 56px;text-align:right;font-weight:800;color:var(--accent2)}
+  .rule-list code{flex:0 0 auto}
+  .rule-list .d{color:var(--muted);font-size:13px}
+  blockquote{border-left:3px solid var(--accent);background:var(--surface);padding:14px 18px;border-radius:0 10px 10px 0;margin:18px 0;color:var(--muted)}
+  .cta{margin:34px 0;background:linear-gradient(100deg,#241a52,#1a1438);border:1px solid var(--line);border-radius:14px;padding:24px;text-align:center}
+  .cta h3{font-size:1.3rem;margin-bottom:6px}
+  .cta p{color:var(--muted);margin:6px 0 16px}
+  .btn{display:inline-block;background:linear-gradient(100deg,var(--accent),#5b46c9);color:#fff;border-radius:10px;padding:13px 24px;font-size:15px;font-weight:700}
+  .btn:hover{text-decoration:none;filter:brightness(1.08)}
+  .install{display:inline-block;margin-top:12px;background:#0c0a1a;border:1px solid var(--line);border-radius:9px;padding:10px 16px;font-family:"SF Mono",ui-monospace,Consolas,monospace;font-size:13px}
+  .install .c{color:var(--accent2)}
+  .method{font-size:13px;color:var(--dim);border:1px solid var(--line);border-radius:10px;padding:16px;margin:30px 0}
+  footer{padding:30px 0 60px;color:var(--dim);font-size:12px;text-align:center;border-top:1px solid var(--line);margin-top:30px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <div class="logo">x402<b>guard</b></div>
+    <div class="nav-links"><a href="/">Grader</a><a href="https://github.com/dario933/x402guard">GitHub</a></div>
+  </nav>
+
+  <header>
+    <div class="kicker">Research · x402guard</div>
+    <h1>The State of x402 Security</h1>
+    <p class="byline">June 2026 · 23 live x402 / agent-payment repositories, scanned</p>
+    <p class="lede">The headlines say agent payments are a hack waiting to happen — "200+ wallets drained." So we pointed our scanner at the actual code. The reality is more reassuring, and more specific, than the headlines suggest.</p>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><div class="n g">61%</div><div class="l">had <b>zero</b> findings of any severity</div></div>
+    <div class="stat"><div class="n g">0</div><div class="l">critical vulnerabilities across the sample</div></div>
+    <div class="stat"><div class="n o">~1 in 8</div><div class="l">scored <b>C or worse</b></div></div>
+    <div class="stat"><div class="n r">81</div><div class="l">error / stack-trace leaks — the #1 issue by far</div></div>
+  </div>
+
+  <h2>The good news: the basics are mostly handled</h2>
+  <p>We scanned 23 public repositories with <code>x402</code> in their name using x402guard's 15-rule integration-layer ruleset. <b>Fourteen of them (61%) came back completely clean</b>, and not a single one had a <i>critical</i> finding. The catastrophic pattern x402guard was built to catch first — a server endpoint that signs and broadcasts a transaction with no authentication — didn't appear once in this sample. The ecosystem is paying more attention than the drama implies.</p>
+
+  <h2>The recurring weak spot: you're leaking your internals</h2>
+  <p>One issue dwarfed everything else. <b>Error and stack-trace leaks accounted for 81 of all findings</b> — endpoints returning a raw error (or full stack trace) in the HTTP response. On its own it's "only" medium severity. But to an attacker probing an agent-payment API, a leaked stack trace is a free map: file paths, dependency versions, framework internals, sometimes the shape of a database query. It's the reconnaissance step that makes the <i>next</i> attack cheap.</p>
+  <blockquote>The fix is trivial — return a generic error to the client, log the detail server-side — which is exactly why it's worth doing. Free defense rarely is.</blockquote>
+
+  <h2>...and the tail is genuinely dangerous</h2>
+  <p>Averages hide the risk. While most projects were clean, <b>roughly one in eight scored C or worse</b>, and the worst <b>carried four separate high-severity findings</b> — including a value-moving contract function with no reentrancy guard and privileged setters with no access control. When x402 code goes wrong, it goes wrong <i>around money</i>. (We don't name individual repos — these were reported through normal channels, not published.)</p>
+
+  <p>Beyond the leaks, the other patterns that showed up:</p>
+  <ul class="rule-list">
+    <li><span class="bar">10×</span><code>SOL-PRIVILEGED-NO-MODIFIER</code><span class="d">privileged setter with no access modifier</span></li>
+    <li><span class="bar">4×</span><code>SOL-REENTRANCY</code><span class="d">value-moving function without a reentrancy guard</span></li>
+    <li><span class="bar">2×</span><code>X402-WEAK-RANDOM</code><span class="d"><code>Math.random()</code> for an id / token / nonce</span></li>
+    <li><span class="bar">2×</span><code>X402-CORS-WILDCARD</code><span class="d">wildcard CORS on a sensitive endpoint</span></li>
+    <li><span class="bar">1×</span><code>X402-INMEM-RATELIMIT</code><span class="d">in-memory rate limiter (useless on serverless)</span></li>
+  </ul>
+
+  <h2>The takeaway</h2>
+  <p>x402 builders are getting the headline stuff right — the missing-auth, money-moving disasters are rare. The real exposure has moved to the <b>web↔chain glue</b>: error handling, access modifiers, randomness, CORS, rate limiting. None of it is caught by Slither or MythX, because none of it lives in the contract. It lives in the integration — and the integration is now the soft underbelly of agent payments.</p>
+
+  <div class="cta">
+    <h3>How does your x402 integration score?</h3>
+    <p>Paste a snippet or scan a public repo — free, no signup, same 15-rule engine.</p>
+    <a class="btn" href="/">Scan my code →</a>
+    <div class="install"><span class="c">npx</span> x402guard .</div>
+  </div>
+
+  <div class="method">
+    <b>Methodology.</b> 23 public GitHub repositories with <code>x402</code> in the name, actively pushed in 2026, scanned via the public x402guard grader (15-rule integration-layer ruleset) in June 2026. Awesome-lists and security tooling were excluded; demos and integrations were included. Counts are finding-instances across the sample. x402guard is heuristic static analysis — it has false positives and negatives and complements, but does not replace, a professional smart-contract / ZK audit. Individual repositories are not named; any high-severity issues were communicated privately.
+  </div>
+
+  <footer>
+    x402<b style="color:var(--accent2)">guard</b> · <a href="/">free grader</a> · <a href="https://github.com/dario933/x402guard">GitHub</a> · <a href="https://www.npmjs.com/package/x402guard">npm</a><br>
+    Security scanner for x402 / agent-payment integrations · MIT
+  </footer>
+</div>
+</body>
+</html>

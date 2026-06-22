@@ -1,0 +1,18 @@
+# x402guard
+
+> Security scanner for x402 / agent-payment integrations. It finds the web↔chain-glue bugs that general Solidity scanners (Slither, MythX) don't look for — unauthenticated treasury broadcast, replay / missing nonce, web-layer idempotency, SSRF webhooks, fail-open auth, unlimited approvals — in the integration code, not just the contract.
+
+## Use it
+- Free web grader (paste code or scan a public GitHub repo): https://x402guard.io
+- CLI (zero-dependency Node ≥18, CI gate, GitHub Action): `npx x402guard .`
+- npm: https://www.npmjs.com/package/x402guard
+- Source (MIT): https://github.com/dario933/x402guard
+
+## Research
+- The State of x402 Security (June 2026): https://x402guard.io/report.html — 23 live x402 repos scanned; 61% clean, zero criticals, but error/stack-trace leaks were the dominant issue (81 instances).
+
+## What it checks (15 rules)
+Drawn from the "Five Attacks on x402" taxonomy and real escrow-audit findings: replay/nonce, web-layer idempotency, unauthenticated treasury broadcast, fail-open auth, SSRF webhooks, unlimited approvals, reentrancy, tx.origin owner, raw ERC20, weak randomness, stack-trace leaks, wildcard CORS, in-memory rate limiting.
+
+## Contact
+Security reviews and continuous monitoring: dario@dmeomaha.com
