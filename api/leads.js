@@ -9,12 +9,14 @@ const send = (res, status, body, type) => {
   res.end(typeof body === 'string' ? body : JSON.stringify(body));
 };
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const { timingSafeEqual } = require('crypto');
+const safeEqual = (a, b) => { const ab = Buffer.from(String(a)), bb = Buffer.from(String(b)); return ab.length === bb.length && timingSafeEqual(ab, bb); };
 
 module.exports = async (req, res) => {
   const key = process.env.LEADS_KEY;
   const u = new URL(req.url, 'http://x');
   const given = u.searchParams.get('key') || (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-  if (!key || given !== key) return send(res, 401, { error: 'unauthorized' });
+  if (!key || !safeEqual(given, key)) return send(res, 401, { error: 'unauthorized' });
 
   const urlRaw = process.env.UPSTASH_REDIS_REST_URL, token = process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!urlRaw || !token) return send(res, 503, { error: 'storage_not_configured' });
@@ -33,7 +35,7 @@ module.exports = async (req, res) => {
     <td>${esc((l.at || '').replace('T', ' ').slice(0, 16))}</td>
     <td><a href="mailto:${esc(l.email)}">${esc(l.email)}</a></td>
     <td><b>${esc(l.grade)}</b></td>
-    <td>${l.repo ? `<a href="${esc(l.repo)}" target="_blank" rel="noopener">${esc(l.repo)}</a>` : ''}</td>
+    <td>${/^https?:\/\//i.test(l.repo || '') ? `<a href="${esc(l.repo)}" target="_blank" rel="noopener">${esc(l.repo)}</a>` : esc(l.repo || '')}</td>
     <td>${esc(l.msg)}</td>
     <td>${esc(l.ip)}</td></tr>`).join('');
   const html = `<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex"><title>x402guard leads (${leads.length})</title>

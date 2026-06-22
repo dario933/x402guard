@@ -1,15 +1,42 @@
 {
   "name": "x402guard",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Security scanner for x402 / agent-payment integrations — finds the integration-layer bugs general Solidity scanners miss (replay, allowance, idempotency, unauthenticated broadcast, SSRF webhooks).",
-  "bin": { "x402guard": "bin/x402guard.js" },
-  "scripts": { "scan": "node bin/x402guard.js", "test": "node test/run.js" },
+  "bin": {
+    "x402guard": "bin/x402guard.js"
+  },
+  "scripts": {
+    "scan": "node bin/x402guard.js",
+    "test": "node test/run.js"
+  },
   "license": "MIT",
   "author": "Dario <dario@dmeomaha.com>",
-  "repository": { "type": "git", "url": "git+https://github.com/dario933/x402guard.git" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dario933/x402guard.git"
+  },
   "homepage": "https://github.com/dario933/x402guard#readme",
-  "bugs": { "url": "https://github.com/dario933/x402guard/issues" },
-  "files": ["bin/", "src/", "README.md", "LICENSE"],
-  "keywords": ["x402", "agent-payments", "security", "scanner", "solidity", "ai-agents", "usdc", "audit", "sast"],
-  "engines": { "node": ">=18" }
+  "bugs": {
+    "url": "https://github.com/dario933/x402guard/issues"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "x402",
+    "agent-payments",
+    "security",
+    "scanner",
+    "solidity",
+    "ai-agents",
+    "usdc",
+    "audit",
+    "sast"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
 }

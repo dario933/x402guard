@@ -16,7 +16,8 @@ function buildCtx(p, text) {
   const code = text
     .replace(/\/\*[\s\S]*?\*\//g, m => ' ' + '\n'.repeat((m.match(/\n/g) || []).length))
     .replace(/(^|[^:])\/\/.*$/gm, '$1');
-  return { text, code, lines, path: p, rel: p, lang };
+  const codeLines = code.split(/\r?\n/);
+  return { text, code, lines, codeLines, path: p, rel: p, lang };
 }
 
 function scanFiles(files) {

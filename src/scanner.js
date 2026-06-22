@@ -51,7 +51,8 @@ function scan(target, opts = {}) {
     const code = text
       .replace(/\/\*[\s\S]*?\*\//g, m => ' ' + '\n'.repeat((m.match(/\n/g) || []).length))
       .replace(/(^|[^:])\/\/.*$/gm, '$1');
-    const ctx = { text, code, lines, path: file, rel: relPath, lang };
+    const codeLines = code.split(/\r?\n/);
+    const ctx = { text, code, lines, codeLines, path: file, rel: relPath, lang };
     for (const rule of rules) {
       if (rule.langs && !rule.langs.includes(lang)) continue;
       let hits = [];

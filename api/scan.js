@@ -71,15 +71,20 @@ async function rateState(req) {
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!urlRaw || !token) return { configured: false };
   const url = urlRaw.trim().replace(/\/+$/, '');
-  const ip = (req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown').toString().split(',')[0].trim();
+  const xff = (req.headers['x-forwarded-for'] || '').toString();
+  const ip = (req.headers['x-real-ip'] || xff.split(',').pop() || 'unknown').toString().trim();
   const key = `x402guard:rl:${ip}`;
   const h = { Authorization: `Bearer ${token.trim()}` };
   try {
-    const r = await fetch(`${url}/incr/${encodeURIComponent(key)}`, { headers: h, signal: AbortSignal.timeout(3000) });
-    const body = await r.json().catch(() => ({}));
-    if (!r.ok || typeof body.result !== 'number') { console.error('rl: bad upstash response', r.status, JSON.stringify(body).slice(0, 120)); return { configured: true, error: true }; }
-    const n = body.result;
-    if (n === 1) await fetch(`${url}/expire/${encodeURIComponent(key)}/${RL_WINDOW}`, { headers: h, signal: AbortSignal.timeout(3000) });
+    // Atomic INCR + EXPIRE(NX) in one pipeline (no race that could leave a key without a TTL).
+    const r = await fetch(`${url}/pipeline`, {
+      method: 'POST', headers: { ...h, 'Content-Type': 'application/json' },
+      body: JSON.stringify([['INCR', key], ['EXPIRE', key, RL_WINDOW, 'NX']]),
+      signal: AbortSignal.timeout(3000)
+    });
+    const body = await r.json().catch(() => []);
+    const n = Array.isArray(body) && body[0] && typeof body[0].result === 'number' ? body[0].result : null;
+    if (n === null) { console.error('rl: bad upstash response', r.status, JSON.stringify(body).slice(0, 120)); return { configured: true, error: true }; }
     return { configured: true, count: n, limited: n > RL_LIMIT };
   } catch (e) { console.error('rl: error', e && e.message); return { configured: true, error: true }; } // fail open
 }

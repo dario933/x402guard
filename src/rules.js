@@ -16,23 +16,26 @@ const isHandler = ctx =>
   inApi(ctx) ||
   /export\s+default\s+(async\s+)?function|module\.exports\s*=\s*async|\(\s*req\s*,\s*res\s*\)|res\.(status|json|send)\(/.test(code(ctx));
 
-const linesMatching = (lines, re, extra) => {
-  const out = [];
-  for (let i = 0; i < lines.length; i++) {
-    const l = lines[i];
-    if (re.test(l) && (!extra || extra.test(l))) out.push({ line: i + 1, snippet: l.trim().slice(0, 150) });
+// Match against the comment-stripped copy (ctx.codeLines) so a comment can never
+// create a finding; emit the ORIGINAL line (ctx.lines) as the human-readable snippet.
+const linesMatching = (ctx, re, extra) => {
+  const codeLines = ctx.codeLines || ctx.lines, raw = ctx.lines, out = [];
+  for (let i = 0; i < codeLines.length; i++) {
+    const l = codeLines[i];
+    if (re.test(l) && (!extra || extra.test(l))) out.push({ line: i + 1, snippet: (raw[i] || l).trim().slice(0, 150) });
   }
   return out;
 };
-const firstLine = (lines, re) => {
-  for (let i = 0; i < lines.length; i++) if (re.test(lines[i])) return [{ line: i + 1, snippet: lines[i].trim().slice(0, 150) }];
+const firstLine = (ctx, re) => {
+  const codeLines = ctx.codeLines || ctx.lines, raw = ctx.lines;
+  for (let i = 0; i < codeLines.length; i++) if (re.test(codeLines[i])) return [{ line: i + 1, snippet: (raw[i] || codeLines[i]).trim().slice(0, 150) }];
   return [];
 };
 
 // Heuristic: external/public Solidity functions that move value but aren't reentrancy-guarded.
 function solUnguardedValueMove(ctx) {
   if (!inContracts(ctx)) return [];
-  const { lines } = ctx;
+  const lines = ctx.codeLines || ctx.lines;
   const out = [];
   const valueMove = /safeTransfer(\(|From\()|\.call\{\s*value/;
   let cur = null;
@@ -70,7 +73,7 @@ module.exports = [
       if (!/new\s+ethers\.Wallet\(/.test(t)) return [];
       if (!/\.sendTransaction\(|\.broadcastTransaction\(|\.writeContract\(/.test(t)) return []; // require a real broadcast, not address derivation
       if (/hmac|x-awm-signature|verifysignature|isvalidsignature|requireauth|authorize|bearer|timingsafeequal|x-admin-secret/i.test(t)) return [];
-      return firstLine(ctx.lines, /\.sendTransaction\(|\.broadcastTransaction\(|\.writeContract\(/);
+      return firstLine(ctx,/\.sendTransaction\(|\.broadcastTransaction\(|\.writeContract\(/);
     }
   },
   {
@@ -123,7 +126,7 @@ module.exports = [
       if (!/x402|settle|consume|receipt|redeem|release|payout/i.test(rel(ctx) + t)) return [];
       if (!/safeTransfer|sendTransaction|writeContract|\bmarkPaid\b|\bpayout\b|release\s*\(/i.test(t)) return [];
       if (/nonce|idempoten|already(Used|Processed|Settled)|usedDigest|jti|dedup|seen[A-Z]|replay/i.test(t)) return [];
-      return firstLine(ctx.lines, /safeTransfer|sendTransaction|writeContract|\bmarkPaid\b|\bpayout\b|release\s*\(/i);
+      return firstLine(ctx,/safeTransfer|sendTransaction|writeContract|\bmarkPaid\b|\bpayout\b|release\s*\(/i);
     }
   },
   {
@@ -139,7 +142,7 @@ module.exports = [
       if (!/(req|request)\.(body|query)/.test(t)) return [];
       if (!/safeTransfer|sendTransaction|writeContract|\bmarkPaid\b|\bfulfil|\bdeliver\b|\bpayout\b/i.test(t)) return [];
       if (/idempoten|exactly.?once|already(Processed|Delivered|Settled)|processedSet|dedup|usedDigest|nonce/i.test(t)) return [];
-      return firstLine(ctx.lines, /safeTransfer|sendTransaction|writeContract|\bmarkPaid\b|\bfulfil|\bdeliver\b|\bpayout\b/i);
+      return firstLine(ctx,/safeTransfer|sendTransaction|writeContract|\bmarkPaid\b|\bfulfil|\bdeliver\b|\bpayout\b/i);
     }
   },
   {
@@ -150,7 +153,7 @@ module.exports = [
     ref: 'AWM audit (cron) H4',
     detect(ctx) {
       if (isClientSide(ctx)) return [];
-      return linesMatching(ctx.lines, /if\s*\(\s*process\.env\.[A-Z0-9_]+\s*&&/);
+      return linesMatching(ctx, /if\s*\(\s*process\.env\.[A-Za-z0-9_]*(SECRET|TOKEN|KEY|HMAC|AUTH|ADMIN|CRON|WEBHOOK|PASSWORD|PASS|APIKEY)[A-Za-z0-9_]*\s*&&/i);
     }
   },
   {
@@ -166,7 +169,7 @@ module.exports = [
       // dynamic URL: fetch(variable...) / axios.post(variable...) — not a hardcoded literal endpoint
       if (!/\bfetch\(\s*[a-zA-Z_$]/.test(t) && !/axios\.(post|get|request)\(\s*[a-zA-Z_$]/.test(t) && !/http\.request\(\s*[a-zA-Z_$]/.test(t)) return [];
       if (/allowlist|allowList|isPrivate|blocklist|169\.254|127\.0|metadata|hostname/i.test(t)) return [];
-      return firstLine(ctx.lines, /\bfetch\(\s*[a-zA-Z_$]|axios\.(post|get|request)\(\s*[a-zA-Z_$]|http\.request\(\s*[a-zA-Z_$]/);
+      return firstLine(ctx,/\bfetch\(\s*[a-zA-Z_$]|axios\.(post|get|request)\(\s*[a-zA-Z_$]|http\.request\(\s*[a-zA-Z_$]/);
     }
   },
   {
@@ -183,7 +186,7 @@ module.exports = [
     why: 'Setting owner/admin to tx.origin (a hot EOA) means a single key controls the contract; tx.origin is also phishing-prone. Owner should be a Safe + Timelock.',
     fix: 'Pass an explicit initialOwner = multisig/timelock; never authorize on tx.origin.',
     ref: 'AWM audit H3; SWC-115',
-    detect(ctx) { return linesMatching(ctx.lines, /tx\.origin/); }
+    detect(ctx) { return linesMatching(ctx,/tx\.origin/); }
   },
 
   // ---------- MEDIUM ----------
@@ -193,7 +196,17 @@ module.exports = [
     why: 'Some tokens (USDT-style) do not return a bool; a raw .transfer can silently fail. Use SafeERC20.',
     fix: 'Use OpenZeppelin SafeERC20 (safeTransfer / safeTransferFrom).',
     ref: 'SWC-104',
-    detect(ctx) { if (!inContracts(ctx)) return []; return linesMatching(ctx.lines, /\.transfer(From)?\s*\(/); }
+    detect(ctx) {
+      if (!inContracts(ctx)) return [];
+      const L = ctx.codeLines || ctx.lines, out = [];
+      for (let i = 0; i < L.length; i++) {
+        const l = L[i];
+        if (!/\.transfer(From)?\s*\(/.test(l)) continue;
+        if (/payable\s*\([^)]*\)\s*\.transfer|\.transfer\s*\{|address\s*\([^)]*\)\s*\.transfer/.test(l)) continue; // native ETH send, not ERC20
+        out.push({ line: i + 1, snippet: (ctx.lines[i] || l).trim().slice(0, 150) });
+      }
+      return out;
+    }
   },
   {
     id: 'SOL-UNLIMITED-APPROVAL', severity: 'medium', category: 'allowance (Five Attacks #III)', langs: ['sol', 'js'],
@@ -201,7 +214,7 @@ module.exports = [
     why: 'Granting type(uint256).max allowance means a bug or compromise can drain the full balance, not just the intended amount.',
     fix: 'Approve only the exact amount needed; reset to 0 after; consider permit-style scoped approvals.',
     ref: 'Five Attacks on x402 #III (allowance bypass)',
-    detect(ctx) { return linesMatching(ctx.lines, /approve\(/, /max|MaxUint|ffffffffffffffff|2\*\*256|type\(uint256\)/i); }
+    detect(ctx) { return linesMatching(ctx, /approve\s*\(/, /type\(uint256\)\.max|MaxUint256|\.MaxUint256|constants\.MaxUint256|0xf{40,}|2\s*\*\*\s*256\s*-\s*1|uint256\)\.max/i); }
   },
   {
     id: 'SOL-PRIVILEGED-NO-MODIFIER', severity: 'medium', category: 'access control', langs: ['sol'],
@@ -212,7 +225,7 @@ module.exports = [
     detect(ctx) {
       if (!inContracts(ctx)) return [];
       const out = [];
-      const { lines } = ctx;
+      const lines = ctx.codeLines || ctx.lines;
       for (let i = 0; i < lines.length; i++) {
         if (!/function\s+(set|withdraw|rescue|upgrade|pause|unpause|mint|setFee|setVerifier|setZKVerifier|migrate)\w*/i.test(lines[i])) continue;
         let sig = lines[i], j = i;
@@ -228,7 +241,7 @@ module.exports = [
     why: 'Math.random() is not a CSPRNG. Correlation IDs / tokens / nonces built from it are predictable and forgeable.',
     fix: 'Use crypto.randomUUID() or crypto.randomBytes(16).toString("hex").',
     ref: 'AWM audit L13; CWE-338',
-    detect(ctx) { return linesMatching(ctx.lines, /Math\.random\(\)/, /id|token|nonce|secret|key|quote|request|session/i); }
+    detect(ctx) { return linesMatching(ctx,/Math\.random\(\)/, /id|token|nonce|secret|key|quote|request|session/i); }
   },
   {
     id: 'X402-STACKTRACE-LEAK', severity: 'medium', category: 'info disclosure', langs: ['js'],
@@ -240,11 +253,12 @@ module.exports = [
       if (isClientSide(ctx)) return [];
       const out = [];
       const seen = new Set();
-      for (let i = 0; i < ctx.lines.length; i++) {
-        const l = ctx.lines[i];
+      const L = ctx.codeLines || ctx.lines;
+      for (let i = 0; i < L.length; i++) {
+        const l = L[i];
         const inResponse = /res\.(status\([^)]*\)\.)?(json|send|end)\(|return\s+Response|return\s+res|res\.write\(|json\(\{/.test(l);
         const leaks = /\.stack\b|\.message\b/.test(l) || /(stack|message|error)\s*:\s*[\w.]*(err|error|e)\.(stack|message)/.test(l);
-        if (inResponse && leaks && !seen.has(i)) { seen.add(i); out.push({ line: i + 1, snippet: l.trim().slice(0, 150) }); }
+        if (inResponse && leaks && !seen.has(i)) { seen.add(i); out.push({ line: i + 1, snippet: (ctx.lines[i] || l).trim().slice(0, 150) }); }
       }
       return out;
     }
@@ -257,7 +271,7 @@ module.exports = [
     why: 'Wildcard CORS on endpoints that expose tools/data lets any web page invoke them cross-origin.',
     fix: 'Restrict to known origins; keep wildcard only for intentionally-public, read-only discovery endpoints.',
     ref: 'OWASP',
-    detect(ctx) { return linesMatching(ctx.lines, /Access-Control-Allow-Origin/, /\*/); }
+    detect(ctx) { return linesMatching(ctx,/Access-Control-Allow-Origin/, /\*/); }
   },
   {
     id: 'X402-INMEM-RATELIMIT', severity: 'low', category: 'rate limiting', langs: ['js'],
@@ -267,7 +281,7 @@ module.exports = [
     ref: 'AWM audit M11',
     detect(ctx) {
       if (!/rate|bucket|limit|throttle/i.test(ctx.text)) return [];
-      return linesMatching(ctx.lines, /new\s+Map\(\)/, /rate|bucket|limit|throttle/i);
+      return linesMatching(ctx,/new\s+Map\(\)/, /rate|bucket|limit|throttle/i);
     }
   }
 ];

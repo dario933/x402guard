@@ -30,7 +30,10 @@ async function readBody(req) {
 }
 
 function clientIp(req) {
-  return (req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown').toString().split(',')[0].trim();
+  // On Vercel, x-real-ip is the true client IP and cannot be spoofed by the client.
+  // Fall back to the LAST x-forwarded-for entry (the one the platform appends), never the first.
+  const xff = (req.headers['x-forwarded-for'] || '').toString();
+  return (req.headers['x-real-ip'] || xff.split(',').pop() || 'unknown').toString().trim();
 }
 
 async function rateLimited(req) {
@@ -40,11 +43,16 @@ async function rateLimited(req) {
   const key = `x402guard:rl-lead:${clientIp(req)}`;
   const h = { Authorization: `Bearer ${token.trim()}` };
   try {
-    const r = await fetch(`${url}/incr/${encodeURIComponent(key)}`, { headers: h, signal: AbortSignal.timeout(3000) });
-    const body = await r.json().catch(() => ({}));
-    if (!r.ok || typeof body.result !== 'number') return false;
-    if (body.result === 1) await fetch(`${url}/expire/${encodeURIComponent(key)}/${RL_WINDOW}`, { headers: h, signal: AbortSignal.timeout(3000) });
-    return body.result > RL_LIMIT;
+    // Atomic INCR + EXPIRE(NX) in one pipeline — avoids the race where a separate
+    // EXPIRE can fail and leave the key with no TTL (which would permanently block an IP).
+    const r = await fetch(`${url}/pipeline`, {
+      method: 'POST', headers: { ...h, 'Content-Type': 'application/json' },
+      body: JSON.stringify([['INCR', key], ['EXPIRE', key, RL_WINDOW, 'NX']]),
+      signal: AbortSignal.timeout(3000)
+    });
+    const body = await r.json().catch(() => []);
+    const n = Array.isArray(body) && body[0] && typeof body[0].result === 'number' ? body[0].result : 0;
+    return n > RL_LIMIT;
   } catch { return false; } // fail open
 }
 
@@ -102,9 +110,10 @@ module.exports = async (req, res) => {
   const email = (body.email || '').toString().trim().slice(0, 200);
   if (!EMAIL_RE.test(email)) return send(res, 400, { error: 'Please enter a valid email.' });
 
+  const repoRaw = (body.repo || '').toString().trim().slice(0, 300);
   const lead = {
     email,
-    repo: (body.repo || '').toString().trim().slice(0, 300),
+    repo: /^https?:\/\//i.test(repoRaw) ? repoRaw : '', // only store real http(s) URLs (blocks javascript: etc.)
     msg: (body.msg || '').toString().trim().slice(0, 4000),
     grade: (body.grade || '').toString().trim().slice(0, 4),
     ip: clientIp(req),

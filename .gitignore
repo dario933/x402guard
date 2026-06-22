@@ -2,6 +2,11 @@ node_modules/
 *.log
 npm-debug.log*
 
+# secrets / env
+.env
+.env.*
+!.env.example
+
 # scan outputs (don't commit reports of other people's repos)
 scan-*.html
 scan-*.json
