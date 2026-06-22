@@ -263,8 +263,11 @@
       <input type="text" id="rf-repo" placeholder="https://github.com/owner/name">
       <label for="rf-msg">What do you want reviewed?</label>
       <textarea id="rf-msg" placeholder="x402 endpoints, escrow contract, ZK verifier, treasury flow…"></textarea>
+      <input type="text" id="rf-grade" style="display:none" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <input type="text" id="rf-company" name="company" style="display:none" tabindex="-1" autocomplete="off" aria-hidden="true">
       <button class="btn" type="submit" style="margin-top:14px">Send request →</button>
-      <p class="hint" style="margin-top:10px">Opens your email client to dario@dmeomaha.com. Prefer direct? <a href="mailto:dario@dmeomaha.com">dario@dmeomaha.com</a></p>
+      <p class="hint" id="rf-status" style="margin-top:10px;display:none"></p>
+      <p class="hint" style="margin-top:8px">Sent straight to me — usually a same-day reply. Prefer email? <a href="mailto:dario@dmeomaha.com">dario@dmeomaha.com</a></p>
     </form>
   </section>
 
@@ -334,6 +337,13 @@ function render(r) {
         '</div>';
     }
   }
+  const bad = (c.critical + c.high) > 0 || ['D', 'F'].includes(r.letter);
+  window.__lastScan = { source: r.source || '', letter: r.letter || '' };
+  if (bad) {
+    html += '<div class="cta-band" style="margin-top:16px"><p>⚠ <b>' + num(c.critical + c.high) + ' critical/high finding(s)</b> — this is exactly what an attacker probes first. Want a human to verify these and write the fixes?</p><a class="btn" href="#book" onclick="prefillReview()">Get a security review →</a></div>';
+  } else if (r.letter) {
+    html += '<div class="cta-band" style="margin-top:16px"><p>Clean on the current ruleset. Want it to <b>stay</b> clean as you ship? Continuous CI + runtime monitoring is in early access.</p><a class="btn-ghost" href="#book" onclick="prefillReview()">Lock in early access →</a></div>';
+  }
   out.innerHTML = html;
 }
 
@@ -353,15 +363,40 @@ $('#run-paste').addEventListener('click', e => scan({ code: code.value, filename
 $('#run-repo').addEventListener('click', e => scan({ repo: $('#repo').value }, e.target));
 $('#repo').addEventListener('keydown', e => { if (e.key === 'Enter') $('#run-repo').click(); });
 
+function prefillReview() {
+  const s = window.__lastScan || {};
+  const g = $('#rf-grade'); if (g) g.value = s.letter || '';
+  const rfRepo = $('#rf-repo');
+  if (rfRepo && !rfRepo.value && s.source && s.source.indexOf('/') > -1 && s.source.indexOf('.') === -1) {
+    rfRepo.value = 'https://github.com/' + s.source.split('@')[0];
+  }
+}
+
 const rf = $('#reviewForm');
-if (rf) rf.addEventListener('submit', e => {
+if (rf) rf.addEventListener('submit', async e => {
   e.preventDefault();
-  const email = $('#rf-email').value.trim();
-  const repo = $('#rf-repo').value.trim();
-  const msg = $('#rf-msg').value.trim();
-  const subject = encodeURIComponent('x402guard security review request');
-  const body = encodeURIComponent('Email: ' + email + '\nRepo: ' + repo + '\n\n' + msg);
-  window.location.href = 'mailto:dario@dmeomaha.com?subject=' + subject + '&body=' + body;
+  const btn = rf.querySelector('button[type=submit]');
+  const status = $('#rf-status');
+  const payload = {
+    email: $('#rf-email').value.trim(),
+    repo: $('#rf-repo').value.trim(),
+    msg: $('#rf-msg').value.trim(),
+    grade: $('#rf-grade').value.trim(),
+    company: $('#rf-company').value.trim() // honeypot
+  };
+  if (!payload.email) return;
+  const lbl = btn.textContent; btn.disabled = true; btn.textContent = 'Sending…'; status.style.display = 'none';
+  try {
+    const r = await fetch('/api/lead', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j.ok) {
+      rf.reset(); status.style.display = 'block'; status.style.color = 'var(--good)';
+      status.textContent = '✓ Got it — I’ll reply with scope and a fixed quote, usually same day.';
+    } else { throw new Error(j.error || 'failed'); }
+  } catch (err) {
+    status.style.display = 'block'; status.style.color = 'var(--crit)';
+    status.innerHTML = 'Something went wrong — email me directly: <a href="mailto:dario@dmeomaha.com">dario@dmeomaha.com</a>';
+  } finally { btn.disabled = false; btn.textContent = lbl; }
 });
 </script>
 </body>
